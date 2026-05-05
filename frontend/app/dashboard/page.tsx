@@ -131,28 +131,30 @@ export default function Dashboard() {
               >
                 <div className="flex justify-between items-start mb-3">
                   <h3 className="text-lg font-semibold">{post.title}</h3>
-                  <div className="flex gap-1">
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => {
-                        setEditingPost(post);
-                        setFormData({
-                          title: post.title,
-                          content: post.content,
-                        });
-                        setShowModal(true);
-                      }}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => deleteMutation.mutate(post.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {String(user?.id) === String(post.user_id) && (
+                    <div className="flex gap-1">
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => {
+                          setEditingPost(post);
+                          setFormData({
+                            title: post.title,
+                            content: post.content,
+                          });
+                          setShowModal(true);
+                        }}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => deleteMutation.mutate(post.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-sm text-base-content/70 mb-4 line-clamp-3">

@@ -25,16 +25,9 @@ export default function Register() {
 
     try {
       await api.post("/register", formData);
-      const { data: loginData } = await api.post("/login", {
-        username: formData.username,
-        password: formData.password,
-      });
-      login(loginData.user, loginData.token);
-      router.push("/dashboard");
+      router.push("/login");
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed");
-    } finally {
-      setLoading(false);
     }
   };
 
