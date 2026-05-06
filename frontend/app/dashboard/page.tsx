@@ -17,13 +17,23 @@ export default function Dashboard() {
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [formData, setFormData] = useState({ title: "", content: "" });
 
-  const { data: posts = [], isLoading } = useQuery<Post[]>({
-    queryKey: ["posts"],
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingPost, setDeletingPost] = useState<Post | null>(null);
+
+
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["posts", page],
     queryFn: async () => {
-      const res = await api.get("/posts");
-      return res.data.data.data;
+      const res = await api.get(`/posts?page=${page}`);
+      return res.data.data;
     },
   });
+
+  const posts = data?.data || [];
+  const currentPage = data?.current_page || 1;
+  const lastPage = data?.last_page || 1;
 
   const createMutation = useMutation({
     mutationFn: (data: { title: string; content: string }) =>
@@ -50,10 +60,22 @@ export default function Dashboard() {
     },
   });
 
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/posts/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["posts"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      setShowDeleteModal(false);
+      setDeletingPost(null);
+    },
   });
+
+  const handleDelete = (post: Post) => {
+    setDeletingPost(post);
+    setShowDeleteModal(true);
+  };
+
+
 
   const handleSubmit = () => {
     startTransition(() => {
@@ -66,7 +88,7 @@ export default function Dashboard() {
   };
 
   const filteredPosts = posts.filter(
-    (p) =>
+    (p: Post) =>
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.content.toLowerCase().includes(search.toLowerCase()),
   );
@@ -87,7 +109,7 @@ export default function Dashboard() {
               <input
                 type="text"
                 placeholder="Search..."
-                className="input input-bordered input-sm pl-8 w-52 focus:ring-2 focus:ring-primary"
+                className="input input-bordered input-sm pl-8 w-52"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -112,129 +134,162 @@ export default function Dashboard() {
         ) : filteredPosts.length === 0 ? (
           <div className="bg-base-100 rounded-2xl shadow-md p-10 text-center">
             <h3 className="text-xl font-semibold mb-2">No posts yet</h3>
-            <p className="text-base-content/60 mb-4">
-              Start by creating your first post
-            </p>
             <button
-              className="btn btn-primary rounded-xl"
+              className="btn btn-primary mt-4"
               onClick={() => setShowModal(true)}
             >
               Create Post
             </button>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {filteredPosts.map((post) => (
-              <div
-                key={post.id}
-                className="bg-base-100 rounded-2xl shadow-md hover:shadow-xl transition-all duration-200 p-5"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-lg font-semibold">{post.title}</h3>
-                  {String(user?.id) === String(post.user_id) && (
-                    <div className="flex gap-1">
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => {
-                          setEditingPost(post);
-                          setFormData({
-                            title: post.title,
-                            content: post.content,
-                          });
-                          setShowModal(true);
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => deleteMutation.mutate(post.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <p className="text-sm text-base-content/70 mb-4 line-clamp-3">
-                  {post.content}
-                </p>
-
-                <div className="flex justify-between items-center text-xs text-base-content/60">
-                  <Link
-                    href={`/posts/${post.id}`}
-                    className="hover:text-primary transition"
-                  >
-                    View Details →
-                  </Link>
-                  <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {showModal && (
-          <div className="modal modal-open">
-            <div className="modal-box max-w-2xl rounded-2xl">
-              <h3 className="text-xl font-bold mb-4">
-                {editingPost ? "Edit Post" : "Create Post"}
-              </h3>
-
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Title"
-                  className="input input-bordered w-full focus:ring-2 focus:ring-primary"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                />
-
-                <textarea
-                  placeholder="Write something..."
-                  className="textarea textarea-bordered w-full h-32 focus:ring-2 focus:ring-primary"
-                  value={formData.content}
-                  onChange={(e) =>
-                    setFormData({ ...formData, content: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="modal-action mt-6">
-                <button
-                  className="btn rounded-xl"
-                  onClick={() => {
-                    setShowModal(false);
-                    setEditingPost(null);
-                    setFormData({ title: "", content: "" });
-                  }}
+          <>
+            <div className="grid gap-4">
+              {filteredPosts.map((post: Post) => (
+                <div
+                  key={post.id}
+                  className="bg-base-100 rounded-2xl shadow-md p-5"
                 >
-                  Cancel
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-lg font-semibold">{post.title}</h3>
+
+                    {String(user?.id) === String(post.user_id) && (
+                      <div className="flex gap-1">
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => {
+                            setEditingPost(post);
+                            setFormData({
+                              title: post.title,
+                              content: post.content,
+                            });
+                            setShowModal(true);
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => handleDelete(post)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-sm mb-3">{post.content}</p>
+
+                  <div className="flex justify-between text-xs opacity-70">
+                    <Link href={`/posts/${post.id}`}>Detail →</Link>
+                    <span>
+                      {new Date(post.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col items-center mt-6 gap-2">
+              <div className="join">
+                <button
+                  className="join-item btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  «
+                </button>
+
+                <button className="join-item btn">
+                  Page {currentPage} / {lastPage}
                 </button>
 
                 <button
-                  className="btn btn-primary rounded-xl"
-                  onClick={handleSubmit}
-                  disabled={isPending || !formData.title || !formData.content}
+                  className="join-item btn"
+                  disabled={currentPage === lastPage}
+                  onClick={() => setPage((p) => p + 1)}
                 >
-                  {isPending ? (
-                    <>
-                      <Loader className="w-4 h-4 animate-spin mr-2" />
-                      Saving...
-                    </>
-                  ) : editingPost ? (
-                    "Update"
-                  ) : (
-                    "Create"
-                  )}
+                  »
+                </button>
+              </div>
+
+              <p className="text-sm opacity-60">
+                Showing page {currentPage} of {lastPage}
+              </p>
+            </div>
+          </>
+        )}
+        {showModal && (
+          <div className="modal modal-open">
+            <div className="modal-box">
+              <h3 className="font-bold text-lg">
+                {editingPost ? "Edit Post" : "Create Post"}
+              </h3>
+
+              <input
+                className="input input-bordered w-full mt-4"
+                placeholder="Title"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+              />
+
+              <textarea
+                className="textarea textarea-bordered w-full mt-4"
+                placeholder="Content"
+                value={formData.content}
+                onChange={(e) =>
+                  setFormData({ ...formData, content: e.target.value })
+                }
+              />
+
+              <div className="modal-action">
+                <button className="btn" onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+
+                <button className="btn btn-primary" onClick={handleSubmit}>
+                  Save
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {showDeleteModal && deletingPost && (
+          <div className="modal modal-open">
+            <div className="modal-box">
+              <h3 className="font-bold text-lg">Delete Post</h3>
+              <p className="py-2 text-sm opacity-80">
+                Are you sure you want to delete this post?
+              </p>
+              <div className="bg-base-200 rounded-xl p-3 text-sm">
+                <div className="font-semibold">{deletingPost.title}</div>
+              </div>
+              <div className="modal-action">
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeletingPost(null);
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-error"
+                  onClick={() => deleteMutation.mutate(deletingPost.id)}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
